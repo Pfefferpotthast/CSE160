@@ -1,0 +1,143 @@
+var shrineBase = new Cube();
+  shrineBase.color = [0.8, 0.737, 0.678,1];
+  if(g_normalOn){ shrineBase.textureNum = -3;}
+  shrineBase.matrix.translate(-0.20, -.75, -1.5);
+  var sb = new Matrix4(shrineBase.matrix);
+  shrineBase.matrix.scale(.5,.5,.5)
+  shrineBase.render();
+  var shrineBaseTop = new Cube();
+  shrineBaseTop.color = [0.8, 0.737, 0.678,1];
+  if(g_normalOn){ shrineBaseTop.textureNum = -3;}
+  shrineBaseTop.matrix = new Matrix4(sb);
+  shrineBaseTop.matrix.translate(-.02,.5,-.02);
+  shrineBaseTop.matrix.scale(.55,.10,.55)
+  shrineBaseTop.render();
+  var shrineMiddle = new Cube();
+  shrineMiddle.color = [0.612, 0.475, 0.388,1];
+  if(g_normalOn){ shrineMiddle.textureNum = -3;}
+  shrineMiddle.matrix.translate(-.07,-.14,-1.37);
+  shrineMiddle.matrix.scale(.25,.3,.25);
+  shrineMiddle.render(); 
+  var shrineRoof = new Cube();
+  shrineRoof.color=[0.529, 0.412, 0.337,1];
+  if(g_normalOn){ shrineRoof.textureNum = -3;}
+  shrineRoof.matrix.translate(-.09,.2,-1.27);
+  shrineRoof.matrix.rotate(20,1,0,0);
+  shrineRoof.matrix.scale(.3,.03,.3);
+  shrineRoof.render();
+  var shrineRoof1 = new Cube();
+  shrineRoof1.color=[0.529, 0.412, 0.337,1];
+  if(g_normalOn){ shrineRoof1.textureNum = -3;}
+  shrineRoof1.matrix.translate(-.09,.1,-1.55,1);
+  shrineRoof1.matrix.rotate(-20,1,0,0);
+  shrineRoof1.matrix.scale(.3,.03,.3);
+  shrineRoof1.render();
+  var shrinePillar = new Cube();
+  shrinePillar.color=[0.529, 0.412, 0.337,1];
+  if(g_normalOn){ shrinePillar.textureNum = -3;}
+  shrinePillar.matrix.translate(-0.05,-.16,-1.05);
+  shrinePillar.matrix.scale(.03,.3,.03);
+  shrinePillar.render();
+  var shrinePillar = new Cube();
+  shrinePillar.color=[0.529, 0.412, 0.337,1];
+  if(g_normalOn){ shrinePillar.textureNum = -3;}
+  shrinePillar.matrix.translate(.14,-.16,-1.05);
+  shrinePillar.matrix.scale(.03,.3,.03);
+  shrinePillar.render();
+  var shrinePillar = new Cube();
+  shrinePillar.color=[0.529, 0.412, 0.337,1];
+  if(g_normalOn){ shrinePillar.textureNum = -3;}
+  shrinePillar.matrix.translate(-0.11,.03,-1.05);
+  shrinePillar.matrix.scale(.33,.03,.033);
+  shrinePillar.render();
+
+  var rockPileBig1 = new Cube();
+  rockPileBig1.textureNum = 2; 
+  if(g_normalOn){ rockPileBig1.textureNum = -3;}
+  rockPileBig1.matrix.translate(-4.3,-0.7,0);
+  rockPileBig1.matrix.rotate(90,0,1,0);
+  var rock1Ctrl1 = new Matrix4(rockPileBig1.matrix);
+  rockPileBig1.matrix.scale(.7,.7,.7);
+  rockPileBig1.render();
+  var rockPileSmall1 = new Cube();
+  rockPileSmall1.textureNum = 2; 
+  if(g_normalOn){ rockPileSmall1.textureNum = -3;}
+  rockPileSmall1.matrix = rock1Ctrl1;
+  rockPileSmall1.matrix.translate(-.4,0,0);
+  rockPileSmall1.matrix.scale(.4,.4,.4);
+  rockPileSmall1.render();
+
+  var rockPileBig2 = new Cube();
+  rockPileBig2.textureNum = 2; 
+  if(g_normalOn){ rockPileBig2.textureNum = -3;}
+  rockPileBig2.matrix.translate(3.0,-0.7,3);
+  rockPileBig2.matrix.rotate(225,0,1,0);
+  var rock1Ctrl2 = new Matrix4(rockPileBig2.matrix);
+  rockPileBig2.matrix.scale(.7,.7,.7);
+  rockPileBig2.render();
+  var rockPileSmall2 = new Cube();
+  rockPileSmall2.textureNum = 2; 
+  if(g_normalOn){ rockPileSmall2.textureNum = -3;}
+  rockPileSmall2.matrix = rock1Ctrl2;
+  rockPileSmall2.matrix.translate(-.4,0,0);
+  rockPileSmall2.matrix.scale(.4,.4,.4);
+  rockPileSmall2.render();
+
+  var treeB = new Cube();
+  treeB.color = [0.349, 0.306, 0.184,1];
+  if(g_normalOn){ treeB.textureNum = -3;}
+  treeB.matrix.translate(-3,-.7,-1);
+  var leafP = new Matrix4(treeB.matrix);
+  treeB.matrix.scale(.2,1.7,.2);
+  treeB.render();
+  var leafT = new Cube();
+  leafT.color = [1, 0.475, 0.561,1];
+  if(g_normalOn){ leafT.textureNum = -3;}
+  leafT.matrix = new Matrix4(leafP);  
+  leafT.matrix.translate(-.03, 1.5, -.2);  
+  leafT.matrix.scale(0.8, 0.8, 0.8);  
+  leafT.render();
+  leafB = new Cube();
+  leafB.color = [1, 0.475, 0.561,1];
+  if(g_normalOn){ leafB.textureNum = -3;}
+  leafB.matrix = new Matrix4(leafP);  
+  leafB.matrix.translate(-.7,1.3,-.4);  
+  leafB.matrix.scale(0.7, 0.7, 0.7);  
+  leafB.render();
+  leafC = new Cube();
+  leafC.color = [1, 0.475, 0.561,1];
+  if(g_normalOn){ leafC.textureNum = -3;}
+  leafC.matrix = new Matrix4(leafP);  
+  leafC.matrix.translate(.2,1,-.7);  
+  leafC.matrix.scale(0.7, 0.7, 0.7);  
+  leafC.render();
+
+  var treeB1 = new Cube();
+  treeB1.color = [0.349, 0.306, 0.184,1];
+  if(g_normalOn){ treeB1.textureNum = -3;}
+  treeB1.matrix.translate(3,-.7,1);
+  treeB1.matrix.rotate(90,0,1,0)
+  var leafP1 = new Matrix4(treeB1.matrix);
+  treeB1.matrix.scale(.2,1.7,.2);
+  treeB1.render();
+  var leafT1 = new Cube();
+  leafT1.color = [1, 0.475, 0.561,1];
+  if(g_normalOn){ leafT1.textureNum = -3;}
+  leafT1.matrix = new Matrix4(leafP1);  
+  leafT1.matrix.translate(-.03, 1.5, -.2);  
+  leafT1.matrix.scale(0.8, 0.8, 0.8);  
+  leafT1.render();
+  leafB1 = new Cube();
+  leafB1.color = [1, 0.475, 0.561,1];
+  if(g_normalOn){ leafB1.textureNum = -3;}
+  leafB1.matrix = new Matrix4(leafP1);  
+  leafB1.matrix.translate(-.7,1.3,-.4);  
+  leafB1.matrix.scale(0.7, 0.7, 0.7);  
+  leafB1.render();
+  leafC1 = new Cube();
+  leafC1.color = [1, 0.475, 0.561,1];
+  if(g_normalOn){ leafC1.textureNum = -3;}
+  leafC1.matrix = new Matrix4(leafP1);  
+  leafC1.matrix.translate(.2,1,-.7);  
+  leafC1.matrix.scale(0.7, 0.7, 0.7);  
+  leafC1.render();

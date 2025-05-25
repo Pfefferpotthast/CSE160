@@ -30,6 +30,18 @@ var FSHADER_SOURCE = `
   uniform int u_whichTexture; 
   uniform vec3 u_lightPos;
   uniform vec3 u_cameraPos;
+  uniform bool u_lightOn;
+  uniform bool u_lightSpotOn;
+  uniform vec3 u_lightDirection;
+  uniform float u_limit;
+  uniform vec4 u_lightCol;
+
+  uniform vec4 spotPos;
+  uniform vec3 spotCol;
+  uniform vec3 spotDir;
+  uniform float spotCos;
+  uniform float spotExp; 
+  
   varying vec4 v_VertPos;
   void main() {
     if(u_whichTexture == -3){
@@ -50,11 +62,6 @@ var FSHADER_SOURCE = `
 
     vec3 lightVector = u_lightPos-vec3(v_VertPos); 
     float r = length(lightVector);
-    // if(r<1.0) {
-    //   gl_FragColor = vec4(1,0,0,1);
-    // } else if (r<2.0){
-    //   gl_FragColor= vec4(0,1,0,1);
-    // }
     vec3 L = normalize(lightVector);
     vec3 N = normalize(v_Normal);
     float nDotL = max(dot(N,L),0.0);
@@ -63,11 +70,29 @@ var FSHADER_SOURCE = `
 
     vec3 E = normalize(u_cameraPos-vec3(v_VertPos));
 
-    float specular = pow(max(dot(E,R), 0.0),2.0);
+    float specular = pow(max(dot(E,R), 0.0),10.0);
 
     vec3 diffuse = vec3(gl_FragColor) * nDotL * 0.7;
     vec3 ambient = vec3(gl_FragColor) * 0.3;
-    gl_FragColor = vec4(specular+diffuse+ambient, 1.0); 
+
+  
+
+    if (u_lightOn) {
+    vec3 finalColor = ambient + diffuse + specular * vec3(1.0);
+
+    if (u_lightSpotOn) {
+        vec3 S = normalize(spotPos.xyz - vec3(v_VertPos));
+        float spotEffect = dot(normalize(spotDir), -S);
+
+        if (spotEffect > spotCos) {
+            float spotFactor = pow(spotEffect, spotExp);
+            finalColor += spotCol * spotFactor;
+        }
+    }
+
+    gl_FragColor = vec4(finalColor, 1.0) * u_lightCol;
+}
+
   }`;
 
 let canvas;
@@ -86,6 +111,11 @@ let u_Sampler2;
 let u_whichTexture;
 let u_lightPos;
 let u_cameraPos;
+let u_lightOn;
+let u_lightSpotOn;
+let u_lightDirection;
+let u_limit;
+let u_lightCol;
 
 let t_XBackBody = 0
 let t_YBackBody = 0
@@ -104,6 +134,11 @@ let r_tailAngle = 0;
 let r_tail =0
 let g_normalOn = false; 
 let g_lightPos=[0,1,-2];
+let g_lightCol = [1,1,1,1]; 
+let g_lightOn = true;
+let g_lightSpotOn = true;
+let g_lightDirection = [0.0, 1.0, 0.0];
+let g_limit = Math.cos(Math.PI/6);
 
 let meat1c = 0;
 let meat2c = 0;
@@ -116,17 +151,18 @@ let satisfied = 0;
 function addActionsforHtmlUI() {
   document.getElementById('normalOn').onclick = function() {g_normalOn=true; };
   document.getElementById('normalOff').onclick = function() {g_normalOn=false;};
+  document.getElementById('lightOn').onclick = function() {g_lightOn=true; };
+  document.getElementById('lightOff').onclick = function() {g_lightOn=false;};
   document.getElementById("lightSlideX").addEventListener('mousemove', function(ev) {if(ev.buttons == 1) {g_lightPos[0] = this.value/100; renderAllShapes();}});
   document.getElementById("lightSlideY").addEventListener('mousemove', function(ev) {if(ev.buttons == 1) {g_lightPos[1] = this.value/100; renderAllShapes();}});
   document.getElementById("lightSlideZ").addEventListener('mousemove', function(ev) {if(ev.buttons == 1) {g_lightPos[2] = this.value/100; renderAllShapes();}});
+  document.getElementById("slideRed").addEventListener('mousemove', function(ev) {if(ev.buttons == 1) {g_lightCol[0] = this.value/100; renderAllShapes();}});
+  document.getElementById("slideGreen").addEventListener('mousemove', function(ev) {if(ev.buttons == 1) {g_lightCol[1] = this.value/100; renderAllShapes();}});
+  document.getElementById("slideBlue").addEventListener('mousemove', function(ev) {if(ev.buttons == 1) {g_lightCol[2] = this.value/100; renderAllShapes();}});
 }
 function setupWebGL() {
   canvas = document.getElementById('webgl');
   gl = canvas.getContext("webgl", { preserveDrawingBuffer: true });
-  if (!gl) {
-    console.log('Failed to get the rendering context for WebGL');
-    return;
-  }
   gl.enable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -140,74 +176,30 @@ function connectVariablesToGLSL() {
   }
 
   a_Position = gl.getAttribLocation(gl.program, 'a_Position');
-  if (a_Position < 0){
-    console.log("failed to get location of a_Pos");
-    return;
-  }
   a_UV = gl.getAttribLocation(gl.program, 'a_UV'); 
-  if (a_UV < 0){
-    console.log("failed to get location of a_UV");
-    return;
-  }
   a_Normal = gl.getAttribLocation(gl.program, 'a_Normal');
-  if (a_Normal < 0 ){
-    console.log('Failed to get storage location of a_Normal')
-  }
   u_whichTexture = gl.getUniformLocation(gl.program, 'u_whichTexture');
-  if (u_whichTexture < 0 ){
-    console.log("failed to get location of u_whichTexture");
-  }
   u_FragColor = gl.getUniformLocation(gl.program, 'u_FragColor');
-  if (u_FragColor < 0){
-    console.log("failed to get location of u_Frag");
-    return;
-  }
   u_lightPos = gl.getUniformLocation(gl.program, 'u_lightPos');
-  if(!u_lightPos){
-    console.log("failed to get u_lightPos");
-    return;
-  }
+  u_lightCol = gl.getUniformLocation(gl.program, 'u_lightCol');
   u_cameraPos = gl.getUniformLocation(gl.program, 'u_cameraPos');
-  if(!u_cameraPos){
-    console.log("failed to get camerapos")
-    return;
-  }
   u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
-  if (u_ModelMatrix < 0){
-    console.log("failed to get location of u_ModelMatrix");
-    return;
-  }
   u_GlobalRotateMatrix = gl.getUniformLocation(gl.program, 'u_GlobalRotateMatrix');
-  if (u_GlobalRotateMatrix < 0){
-    console.log("failed to get location of u_GlobRotMat");
-    return;
-  }
   u_ViewMatrix = gl.getUniformLocation(gl.program, 'u_ViewMatrix');
-  if (u_ViewMatrix < 0){
-    console.log("failed to get location of u_ViewMat");
-    return;
-  }
   u_ProjectionMatrix = gl.getUniformLocation(gl.program, 'u_ProjectionMatrix');
-  if (u_ProjectionMatrix < 0){
-    console.log("failed to get location of u_ProjMat");
-    return;
-  }
-
   u_Sampler = gl.getUniformLocation(gl.program, 'u_Sampler0');
-  if (!u_Sampler) {
-    console.log('Failed to get the storage location of u_Sampler0');
-    return false;
-  }
   u_Sampler1 = gl.getUniformLocation(gl.program, 'u_Sampler1');
-  if (!u_Sampler1) {
-    console.log('Failed to get the storage location of u_Sampler1');
-    return false;
-  }
   u_Sampler2 = gl.getUniformLocation(gl.program, 'u_Sampler2');
-  if (!u_Sampler2) {
-    console.log('Failed to get the storage location of u_Sampler2');
-    return false;
-  }
+  u_lightOn = gl.getUniformLocation(gl.program, 'u_lightOn');
+  u_lightSpotOn = gl.getUniformLocation(gl.program, 'u_lightSpotOn');
+  u_lightDirection = gl.getUniformLocation(gl.program, 'u_lightDirection');
+  u_limit = gl.getUniformLocation(gl.program, 'u_limit');
+  spotPos = gl.getUniformLocation(gl.program, 'spotPos');
+  spotCol = gl.getUniformLocation(gl.program, 'spotCol');
+  spotDir = gl.getUniformLocation(gl.program, 'spotDir');
+  spotCos = gl.getUniformLocation(gl.program, 'spotCos');
+  spotExp = gl.getUniformLocation(gl.program, 'spotExp');
+
   var identityM = new Matrix4();
   gl.uniformMatrix4fv(u_ModelMatrix, false, identityM.elements);
 }
@@ -226,6 +218,13 @@ let g_magentaAngle = 0;
 let g_yellowAnimation=false;
 let g_magentaAnimation=false;
 let g_verticalAngle = 0;
+
+let g_spotPos = [0.5, 1.5, 0, 1.0]; 
+let g_spotCol = [1.0, 1.0, 0.8];
+let g_spotDir = [0.0, -1.0, 0.0];     
+let g_spotCutoff = Math.cos(Math.PI / 10);
+let g_spotExp = 20.0;
+
 
 var camera = new Camera();
 
@@ -470,7 +469,162 @@ function renderAllShapes() {
   gl.uniformMatrix4fv(u_ModelMatrix, false, new Matrix4().elements);
 
   gl.uniform3f(u_lightPos, g_lightPos[0], g_lightPos[1], g_lightPos[2]);
-  gl.uniform3f(u_cameraPos, camera.eye.x, camera.eye.y, camera.eye.z);
+  gl.uniform4f(u_lightCol, g_lightCol[0], g_lightCol[1], g_lightCol[2], 1)
+  gl.uniform3f(u_cameraPos, camera.eye.elements[0], camera.eye.elements[1], camera.eye.elements[2]);
+  gl.uniform1i(u_lightOn, g_lightOn);
+  gl.uniform1i(u_lightSpotOn, g_lightSpotOn);
+  gl.uniform3fv(u_lightDirection, g_lightDirection);
+  gl.uniform1f(u_limit, g_limit);
+
+  gl.uniform4fv(spotPos, g_spotPos);
+  gl.uniform3fv(spotCol, g_spotCol);
+  gl.uniform3fv(spotDir, g_spotDir);
+  gl.uniform1f(spotCos, g_spotCutoff);
+  gl.uniform1f(spotExp, g_spotExp);
+
+  var shrineBase = new Cube();
+  shrineBase.color = [0.8, 0.737, 0.678,1];
+  if(g_normalOn){ shrineBase.textureNum = -3;}
+  shrineBase.matrix.translate(-0.20, -.75, -1.5);
+  var sb = new Matrix4(shrineBase.matrix);
+  shrineBase.matrix.scale(.5,.5,.5)
+  shrineBase.render();
+  var shrineBaseTop = new Cube();
+  shrineBaseTop.color = [0.8, 0.737, 0.678,1];
+  if(g_normalOn){ shrineBaseTop.textureNum = -3;}
+  shrineBaseTop.matrix = new Matrix4(sb);
+  shrineBaseTop.matrix.translate(-.02,.5,-.02);
+  shrineBaseTop.matrix.scale(.55,.10,.55)
+  shrineBaseTop.render();
+  var shrineMiddle = new Cube();
+  shrineMiddle.color = [0.612, 0.475, 0.388,1];
+  if(g_normalOn){ shrineMiddle.textureNum = -3;}
+  shrineMiddle.matrix.translate(-.07,-.14,-1.37);
+  shrineMiddle.matrix.scale(.25,.3,.25);
+  shrineMiddle.render(); 
+  var shrineRoof = new Cube();
+  shrineRoof.color=[0.529, 0.412, 0.337,1];
+  if(g_normalOn){ shrineRoof.textureNum = -3;}
+  shrineRoof.matrix.translate(-.09,.2,-1.27);
+  shrineRoof.matrix.rotate(20,1,0,0);
+  shrineRoof.matrix.scale(.3,.03,.3);
+  shrineRoof.render();
+  var shrineRoof1 = new Cube();
+  shrineRoof1.color=[0.529, 0.412, 0.337,1];
+  if(g_normalOn){ shrineRoof1.textureNum = -3;}
+  shrineRoof1.matrix.translate(-.09,.1,-1.55,1);
+  shrineRoof1.matrix.rotate(-20,1,0,0);
+  shrineRoof1.matrix.scale(.3,.03,.3);
+  shrineRoof1.render();
+  var shrinePillar = new Cube();
+  shrinePillar.color=[0.529, 0.412, 0.337,1];
+  if(g_normalOn){ shrinePillar.textureNum = -3;}
+  shrinePillar.matrix.translate(-0.05,-.16,-1.05);
+  shrinePillar.matrix.scale(.03,.3,.03);
+  shrinePillar.render();
+  var shrinePillar = new Cube();
+  shrinePillar.color=[0.529, 0.412, 0.337,1];
+  if(g_normalOn){ shrinePillar.textureNum = -3;}
+  shrinePillar.matrix.translate(.14,-.16,-1.05);
+  shrinePillar.matrix.scale(.03,.3,.03);
+  shrinePillar.render();
+  var shrinePillar = new Cube();
+  shrinePillar.color=[0.529, 0.412, 0.337,1];
+  if(g_normalOn){ shrinePillar.textureNum = -3;}
+  shrinePillar.matrix.translate(-0.11,.03,-1.05);
+  shrinePillar.matrix.scale(.33,.03,.033);
+  shrinePillar.render();
+
+  var rockPileBig1 = new Cube();
+  rockPileBig1.textureNum = 2; 
+  if(g_normalOn){ rockPileBig1.textureNum = -3;}
+  rockPileBig1.matrix.translate(-4.3,-0.7,0);
+  rockPileBig1.matrix.rotate(90,0,1,0);
+  var rock1Ctrl1 = new Matrix4(rockPileBig1.matrix);
+  rockPileBig1.matrix.scale(.7,.7,.7);
+  rockPileBig1.render();
+  var rockPileSmall1 = new Cube();
+  rockPileSmall1.textureNum = 2; 
+  if(g_normalOn){ rockPileSmall1.textureNum = -3;}
+  rockPileSmall1.matrix = rock1Ctrl1;
+  rockPileSmall1.matrix.translate(-.4,0,0);
+  rockPileSmall1.matrix.scale(.4,.4,.4);
+  rockPileSmall1.render();
+
+  var rockPileBig2 = new Cube();
+  rockPileBig2.textureNum = 2; 
+  if(g_normalOn){ rockPileBig2.textureNum = -3;}
+  rockPileBig2.matrix.translate(3.0,-0.7,3);
+  rockPileBig2.matrix.rotate(225,0,1,0);
+  var rock1Ctrl2 = new Matrix4(rockPileBig2.matrix);
+  rockPileBig2.matrix.scale(.7,.7,.7);
+  rockPileBig2.render();
+  var rockPileSmall2 = new Cube();
+  rockPileSmall2.textureNum = 2; 
+  if(g_normalOn){ rockPileSmall2.textureNum = -3;}
+  rockPileSmall2.matrix = rock1Ctrl2;
+  rockPileSmall2.matrix.translate(-.4,0,0);
+  rockPileSmall2.matrix.scale(.4,.4,.4);
+  rockPileSmall2.render();
+
+  var treeB = new Cube();
+  treeB.color = [0.349, 0.306, 0.184,1];
+  if(g_normalOn){ treeB.textureNum = -3;}
+  treeB.matrix.translate(-3,-.7,-1);
+  var leafP = new Matrix4(treeB.matrix);
+  treeB.matrix.scale(.2,1.7,.2);
+  treeB.render();
+  var leafT = new Cube();
+  leafT.color = [1, 0.475, 0.561,1];
+  if(g_normalOn){ leafT.textureNum = -3;}
+  leafT.matrix = new Matrix4(leafP);  
+  leafT.matrix.translate(-.03, 1.5, -.2);  
+  leafT.matrix.scale(0.8, 0.8, 0.8);  
+  leafT.render();
+  leafB = new Cube();
+  leafB.color = [1, 0.475, 0.561,1];
+  if(g_normalOn){ leafB.textureNum = -3;}
+  leafB.matrix = new Matrix4(leafP);  
+  leafB.matrix.translate(-.7,1.3,-.4);  
+  leafB.matrix.scale(0.7, 0.7, 0.7);  
+  leafB.render();
+  leafC = new Cube();
+  leafC.color = [1, 0.475, 0.561,1];
+  if(g_normalOn){ leafC.textureNum = -3;}
+  leafC.matrix = new Matrix4(leafP);  
+  leafC.matrix.translate(.2,1,-.7);  
+  leafC.matrix.scale(0.7, 0.7, 0.7);  
+  leafC.render();
+
+  var treeB1 = new Cube();
+  treeB1.color = [0.349, 0.306, 0.184,1];
+  if(g_normalOn){ treeB1.textureNum = -3;}
+  treeB1.matrix.translate(3,-.7,1);
+  treeB1.matrix.rotate(90,0,1,0)
+  var leafP1 = new Matrix4(treeB1.matrix);
+  treeB1.matrix.scale(.2,1.7,.2);
+  treeB1.render();
+  var leafT1 = new Cube();
+  leafT1.color = [1, 0.475, 0.561,1];
+  if(g_normalOn){ leafT1.textureNum = -3;}
+  leafT1.matrix = new Matrix4(leafP1);  
+  leafT1.matrix.translate(-.03, 1.5, -.2);  
+  leafT1.matrix.scale(0.8, 0.8, 0.8);  
+  leafT1.render();
+  leafB1 = new Cube();
+  leafB1.color = [1, 0.475, 0.561,1];
+  if(g_normalOn){ leafB1.textureNum = -3;}
+  leafB1.matrix = new Matrix4(leafP1);  
+  leafB1.matrix.translate(-.7,1.3,-.4);  
+  leafB1.matrix.scale(0.7, 0.7, 0.7);  
+  leafB1.render();
+  leafC1 = new Cube();
+  leafC1.color = [1, 0.475, 0.561,1];
+  if(g_normalOn){ leafC1.textureNum = -3;}
+  leafC1.matrix = new Matrix4(leafP1);  
+  leafC1.matrix.translate(.2,1,-.7);  
+  leafC1.matrix.scale(0.7, 0.7, 0.7);  
+  leafC1.render();
 
   var light = new Cube();
   light.color = [2,2,0,1];
@@ -478,7 +632,13 @@ function renderAllShapes() {
   light.matrix.scale(-.1,-.1,-.1);
   light.matrix.translate(-.5,-.5,-.5);
   light.render();
-  //drawMap();
+
+  var coob = new Cube()
+  coob.color = [0.5,1,1,1];
+  if(g_normalOn){ coob.textureNum = -3;}
+  coob.matrix.translate(.9,-.3,-.5);
+  coob.matrix.scale(.7,.7,.7);
+  coob.render();
   var orb = new Sphere();
   if(g_normalOn){ orb.textureNum = -3;}
   orb.matrix.translate(0,0,0);
@@ -487,7 +647,8 @@ function renderAllShapes() {
 
   var floor = new Cube();
   floor.color = [1.0,0.0,0.0,1.0];
-  floor.textureNum = 1; 
+  floor.textureNum = 1;
+  if(g_normalOn){ floor.textureNum = -3;} 
   floor.matrix.translate(0, -.75, 0.0);
   floor.matrix.scale(9.5,.001,9.5);
   floor.matrix.translate(-0.5, 0, -0.5);
@@ -501,54 +662,11 @@ function renderAllShapes() {
   sky.matrix.translate(-0.5, -0.5, -0.5);
   sky.render();
 
-  var shrineBase = new Cube();
-  shrineBase.color = [0.8, 0.737, 0.678,1];
-  shrineBase.matrix.translate(-0.20, -.75, -1.5);
-  var sb = new Matrix4(shrineBase.matrix);
-  shrineBase.matrix.scale(.5,.5,.5)
-  shrineBase.render();
-  var shrineBaseTop = new Cube();
-  shrineBaseTop.color = [0.8, 0.737, 0.678,1];
-  shrineBaseTop.matrix = new Matrix4(sb);
-  shrineBaseTop.matrix.translate(-.02,.5,-.02);
-  shrineBaseTop.matrix.scale(.55,.10,.55)
-  shrineBaseTop.render();
-  var shrineMiddle = new Cube();
-  shrineMiddle.color = [0.612, 0.475, 0.388,1];
-  shrineMiddle.matrix.translate(-.07,-.14,-1.37);
-  shrineMiddle.matrix.scale(.25,.3,.25);
-  shrineMiddle.render(); 
-  var shrineRoof = new Cube();
-  shrineRoof.color=[0.529, 0.412, 0.337,1];
-  shrineRoof.matrix.translate(-.09,.2,-1.27);
-  shrineRoof.matrix.rotate(20,1,0,0);
-  shrineRoof.matrix.scale(.3,.03,.3);
-  shrineRoof.render();
-  var shrineRoof1 = new Cube();
-  shrineRoof1.color=[0.529, 0.412, 0.337,1];
-  shrineRoof1.matrix.translate(-.09,.1,-1.55,1);
-  shrineRoof1.matrix.rotate(-20,1,0,0);
-  shrineRoof1.matrix.scale(.3,.03,.3);
-  shrineRoof1.render();
-  var shrinePillar = new Cube();
-  shrinePillar.color=[0.529, 0.412, 0.337,1];
-  shrinePillar.matrix.translate(-0.05,-.16,-1.05);
-  shrinePillar.matrix.scale(.03,.3,.03);
-  shrinePillar.render();
-  var shrinePillar = new Cube();
-  shrinePillar.color=[0.529, 0.412, 0.337,1];
-  shrinePillar.matrix.translate(.14,-.16,-1.05);
-  shrinePillar.matrix.scale(.03,.3,.03);
-  shrinePillar.render();
-  var shrinePillar = new Cube();
-  shrinePillar.color=[0.529, 0.412, 0.337,1];
-  shrinePillar.matrix.translate(-0.11,.03,-1.05);
-  shrinePillar.matrix.scale(.33,.03,.033);
-  shrinePillar.render();
-
+  
 
   var meat1 = new Cube();
   meat1.color = [0.569, 0.192, 0.192,1];
+  if(g_normalOn){ meat1.textureNum = -3;}
   meat1.matrix.translate(3,-.6,-2);
   meat1.matrix.rotate(-45,0,1,0);
   var meatCenter1 = new Matrix4(meat1.matrix);
@@ -556,114 +674,38 @@ function renderAllShapes() {
   
   var bone1 = new Cube();
   bone1.color = [1, 1, 1,1];
+  if(g_normalOn){ bone1.textureNum = -3;}
   bone1.matrix = new Matrix4(meatCenter1);
   bone1.matrix.translate(-.15,.06,.05);
   bone1.matrix.scale(.6,.07,.07); 
 
   var meat2 = new Cube();
   meat2.color = [0.569, 0.192, 0.192,1];
+  if(g_normalOn){ meat2.textureNum = -3;}
   meat2.matrix.translate(-3,-.6,3.5);
   meat2.matrix.rotate(-45,0,1,0);
   var meatCenter2 = new Matrix4(meat2.matrix);
   meat2.matrix.scale(.3,.2,.2); 
-  
   var bone2 = new Cube();
   bone2.color = [1, 1, 1,1];
+  if(g_normalOn){ bone2.textureNum = -3;}
   bone2.matrix = new Matrix4(meatCenter2);
   bone2.matrix.translate(-.15,.06,.05);
   bone2.matrix.scale(.6,.07,.07); 
 
   var meat3 = new Cube();
   meat3.color = [0.569, 0.192, 0.192,1];
+  if(g_normalOn){ meat3.textureNum = -3;}
   meat3.matrix.translate(3,-.6,3.5);
   meat3.matrix.rotate(45,0,1,0);
   var meatCenter3 = new Matrix4(meat3.matrix);
   meat3.matrix.scale(.3,.2,.2); 
-  
   var bone3 = new Cube();
   bone3.color = [1, 1, 1,1];
+  if(g_normalOn){ bone3.textureNum = -3;}
   bone3.matrix = new Matrix4(meatCenter3);
   bone3.matrix.translate(-.15,.06,.05);
   bone3.matrix.scale(.6,.07,.07); 
-
-  var rockPileBig1 = new Cube();
-  rockPileBig1.textureNum = 2; 
-  rockPileBig1.matrix.translate(-4.3,-0.7,0);
-  rockPileBig1.matrix.rotate(90,0,1,0);
-  var rock1Ctrl1 = new Matrix4(rockPileBig1.matrix);
-  rockPileBig1.matrix.scale(.7,.7,.7);
-  rockPileBig1.render();
-  var rockPileSmall1 = new Cube();
-  rockPileSmall1.textureNum = 2; 
-  rockPileSmall1.matrix = rock1Ctrl1;
-  rockPileSmall1.matrix.translate(-.4,0,0);
-  rockPileSmall1.matrix.scale(.4,.4,.4);
-  rockPileSmall1.render();
-
-  var rockPileBig2 = new Cube();
-  rockPileBig2.textureNum = 2; 
-  rockPileBig2.matrix.translate(3.0,-0.7,3);
-  rockPileBig2.matrix.rotate(225,0,1,0);
-  var rock1Ctrl2 = new Matrix4(rockPileBig2.matrix);
-  rockPileBig2.matrix.scale(.7,.7,.7);
-  rockPileBig2.render();
-  var rockPileSmall2 = new Cube();
-  rockPileSmall2.textureNum = 2; 
-  rockPileSmall2.matrix = rock1Ctrl2;
-  rockPileSmall2.matrix.translate(-.4,0,0);
-  rockPileSmall2.matrix.scale(.4,.4,.4);
-  rockPileSmall2.render();
-
-  var treeB = new Cube();
-  treeB.color = [0.349, 0.306, 0.184,1];
-  treeB.matrix.translate(-3,-.7,-1);
-  var leafP = new Matrix4(treeB.matrix);
-  treeB.matrix.scale(.2,1.7,.2);
-  treeB.render();
-  var leafT = new Cube();
-  leafT.color = [1, 0.475, 0.561,1];
-  leafT.matrix = new Matrix4(leafP);  
-  leafT.matrix.translate(-.03, 1.5, -.2);  
-  leafT.matrix.scale(0.8, 0.8, 0.8);  
-  leafT.render();
-  leafB = new Cube();
-  leafB.color = [1, 0.475, 0.561,1];
-  leafB.matrix = new Matrix4(leafP);  
-  leafB.matrix.translate(-.7,1.3,-.4);  
-  leafB.matrix.scale(0.7, 0.7, 0.7);  
-  leafB.render();
-  leafC = new Cube();
-  leafC.color = [1, 0.475, 0.561,1];
-  leafC.matrix = new Matrix4(leafP);  
-  leafC.matrix.translate(.2,1,-.7);  
-  leafC.matrix.scale(0.7, 0.7, 0.7);  
-  leafC.render();
-
-  var treeB1 = new Cube();
-  treeB1.color = [0.349, 0.306, 0.184,1];
-  treeB1.matrix.translate(3,-.7,1);
-  treeB1.matrix.rotate(90,0,1,0)
-  var leafP1 = new Matrix4(treeB1.matrix);
-  treeB1.matrix.scale(.2,1.7,.2);
-  treeB1.render();
-  var leafT1 = new Cube();
-  leafT1.color = [1, 0.475, 0.561,1];
-  leafT1.matrix = new Matrix4(leafP1);  
-  leafT1.matrix.translate(-.03, 1.5, -.2);  
-  leafT1.matrix.scale(0.8, 0.8, 0.8);  
-  leafT1.render();
-  leafB1 = new Cube();
-  leafB1.color = [1, 0.475, 0.561,1];
-  leafB1.matrix = new Matrix4(leafP1);  
-  leafB1.matrix.translate(-.7,1.3,-.4);  
-  leafB1.matrix.scale(0.7, 0.7, 0.7);  
-  leafB1.render();
-  leafC1 = new Cube();
-  leafC1.color = [1, 0.475, 0.561,1];
-  leafC1.matrix = new Matrix4(leafP1);  
-  leafC1.matrix.translate(.2,1,-.7);  
-  leafC1.matrix.scale(0.7, 0.7, 0.7);  
-  leafC1.render();
 
   var meat4 = new Cube();
   meat4.color = [0.569, 0.192, 0.192,1];
